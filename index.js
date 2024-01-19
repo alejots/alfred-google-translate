@@ -7,6 +7,7 @@ import os from "os";
 import { v4 as uuidv4 } from "uuid";
 import languages from "./languages.js";
 import SocksProxyAgent from "socks-proxy-agent";
+import { createPage } from "./helpers/notion.js";
 
 const languagePair = new Configstore("language-config-pair");
 const history = new Configstore("translate-history");
@@ -21,6 +22,19 @@ var g_config = {
 };
 
 var pair = languagePair.get("pair");
+
+createPage("📕", {
+  Word: {
+    title: [
+      {
+        text: {
+          content: alfy.input,
+        },
+      },
+    ],
+  },
+});
+
 if (pair) {
   // auto
   var pair0 = pair[0];
