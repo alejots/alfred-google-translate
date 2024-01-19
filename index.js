@@ -24,7 +24,7 @@ var g_config = {
 var pair = languagePair.get("pair");
 
 createPage("📕", {
-  Tasks: {
+  Word: {
     title: [
       {
         text: {
