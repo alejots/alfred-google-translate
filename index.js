@@ -23,18 +23,6 @@ var g_config = {
 
 var pair = languagePair.get("pair");
 
-createPage("📕", {
-  Word: {
-    title: [
-      {
-        text: {
-          content: alfy.input,
-        },
-      },
-    ],
-  },
-});
-
 if (pair) {
   // auto
   var pair0 = pair[0];
@@ -266,5 +254,21 @@ function doTranslate(opts) {
         //   agent: g_config.agent,
         // });
       }
+    })
+    .then((res) => {
+      // notion
+      var emoji = "📝";
+      var properties = {
+        Word: {
+          title: [
+            {
+              text: {
+                content: alfy.input,
+              },
+            },
+          ],
+        },
+      };
+      createPage(emoji, properties);
     });
 }
