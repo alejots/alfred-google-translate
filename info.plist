@@ -21,6 +21,8 @@
 				<true/>
 			</dict>
 		</array>
+		<key>525521A9-62B9-40EE-B9D6-EB1B484BA29D</key>
+		<array/>
 		<key>C111234F-195C-486B-BB1D-04203C339ADD</key>
 		<array>
 			<dict>
@@ -45,6 +47,33 @@
 	<string>Google Translate</string>
 	<key>objects</key>
 	<array>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>0</integer>
+				<key>script</key>
+				<string>if [ "$voice" = "local" ];then
+say {query} -v Samantha
+else
+afplay {query}
+fi</string>
+				<key>scriptargtype</key>
+				<integer>0</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>525521A9-62B9-40EE-B9D6-EB1B484BA29D</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
 		<dict>
 			<key>config</key>
 			<dict>
@@ -73,33 +102,6 @@
 			<string>alfred.workflow.trigger.hotkey</string>
 			<key>uid</key>
 			<string>C111234F-195C-486B-BB1D-04203C339ADD</string>
-			<key>version</key>
-			<integer>2</integer>
-		</dict>
-		<dict>
-			<key>config</key>
-			<dict>
-				<key>concurrently</key>
-				<false/>
-				<key>escaping</key>
-				<integer>0</integer>
-				<key>script</key>
-				<string>if [ "$voice" = "local" ];then
-say {query} -v Samantha
-else
-afplay {query}
-fi</string>
-				<key>scriptargtype</key>
-				<integer>0</integer>
-				<key>scriptfile</key>
-				<string></string>
-				<key>type</key>
-				<integer>0</integer>
-			</dict>
-			<key>type</key>
-			<string>alfred.workflow.action.script</string>
-			<key>uid</key>
-			<string>525521A9-62B9-40EE-B9D6-EB1B484BA29D</string>
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
