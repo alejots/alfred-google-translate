@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>bundleid</key>
-	<string>com.xfslove.translate</string>
+	<string>com.tunaroza.translate</string>
 	<key>category</key>
-	<string>Tools</string>
+	<string>Productivity</string>
 	<key>connections</key>
 	<dict>
 		<key>287F7DE4-2A8A-4356-9659-797E2F2AE72A</key>
@@ -38,7 +38,7 @@
 		</array>
 	</dict>
 	<key>createdby</key>
-	<string>hanwen.huang</string>
+	<string>Alejandro Tunaroza</string>
 	<key>description</key>
 	<string>Alfred 3 workflow to translate with google tanslate api</string>
 	<key>disabled</key>
@@ -186,6 +186,6 @@ fi</string>
 	<key>version</key>
 	<string></string>
 	<key>webaddress</key>
-	<string>https://github.com/xfslove/alfred-google-translate#readme</string>
+	<string>https://github.com/alejots/alfred-google-translate/</string>
 </dict>
 </plist>

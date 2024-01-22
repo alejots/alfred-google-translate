@@ -228,6 +228,20 @@ function doTranslate(opts) {
       return res;
     })
     .then((res) => {
+      createPage("📕", {
+        Word: {
+          title: [
+            {
+              text: {
+                content: alfy.input,
+              },
+            },
+          ],
+        },
+      });
+      return res;
+    })
+    .then((res) => {
       // // tts
       if (g_config.voice === "remote") {
         // var fromArray = [];
