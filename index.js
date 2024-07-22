@@ -268,6 +268,12 @@ function doTranslate(opts) {
             },
           ],
         },
+        Status: {
+          type: "status",
+          status: {
+            name: "New",
+          },
+        },
       };
       createPage(emoji, properties);
     });
