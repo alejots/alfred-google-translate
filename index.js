@@ -274,6 +274,18 @@ function doTranslate(opts) {
             name: "New",
           },
         },
+        CambridgeLink: {
+          rich_text: [
+            {
+              text: {
+                content: `https://dictionary.cambridge.org/dictionary/english-spanish/${encodeURIComponent(alfy.input)}`,
+                link: {
+                  url: `https://dictionary.cambridge.org/dictionary/english-spanish/${encodeURIComponent(alfy.input)}`,
+                },
+              },
+            },
+          ],
+        },
       };
       createPage(emoji, properties);
     });
