@@ -99,6 +99,30 @@ if (pair) {
   });
 }
 
+async function validateUrl(url) {
+  try {
+    const response = await fetch(url, {
+      method: "HEAD",
+      redirect: "manual", // Don't follow redirects automatically
+    });
+
+    // If status is 200, the page exists
+    // If status is 3xx (redirect), check where it's redirecting to
+    if (response.status === 200) {
+      return true;
+    } else if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      // If redirecting to base dictionary path, word doesn't exist
+      const exists = location && !location.endsWith("/english-spanish/");
+      return exists;
+    }
+
+    return false;
+  } catch (error) {
+    return false;
+  }
+}
+
 function doTranslate(opts) {
   translator
     .translate(opts.text, {
@@ -254,9 +278,16 @@ function doTranslate(opts) {
         //   agent: g_config.agent,
         // });
       }
+
+      return res;
     })
-    .then((res) => {
+    .then(async (res) => {
       // notion
+      const cambridgeUrl = `https://dictionary.cambridge.org/dictionary/english-spanish/${encodeURIComponent(alfy.input)}`;
+
+      // Check if Cambridge link exists
+      const linkExists = await validateUrl(cambridgeUrl);
+
       var properties = {
         Word: {
           title: [
@@ -273,19 +304,24 @@ function doTranslate(opts) {
             name: "New",
           },
         },
-        CambridgeLink: {
+      };
+
+      // Only add Cambridge link if it exists
+      if (linkExists) {
+        properties.CambridgeLink = {
           rich_text: [
             {
               text: {
-                content: `https://dictionary.cambridge.org/dictionary/english-spanish/${encodeURIComponent(alfy.input)}`,
+                content: cambridgeUrl,
                 link: {
-                  url: `https://dictionary.cambridge.org/dictionary/english-spanish/${encodeURIComponent(alfy.input)}`,
+                  url: cambridgeUrl,
                 },
               },
             },
           ],
-        },
-      };
+        };
+      }
+
       createPage(properties).catch((error) => {
         console.error("Failed to create Notion page:", error.message);
       });
