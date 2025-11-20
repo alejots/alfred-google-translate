@@ -79,7 +79,7 @@ function single(text, opts) {
       return url + "?" + querystring.stringify(data);
     })
     .then(function (url) {
-      return got(url, { encoding: null, agent: opts.agent })
+      return got(url, { responseType: "buffer", agent: opts.agent })
         .then(function (res) {
           fs.appendFile(opts.file, res.body, function (err) {
             if (err) throw err;

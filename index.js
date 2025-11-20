@@ -7,7 +7,15 @@ import os from "os";
 import { v4 as uuidv4 } from "uuid";
 import languages from "./languages.js";
 import SocksProxyAgent from "socks-proxy-agent";
-import { createPage } from "./helpers/notion.js";
+import { createPage, appendToPage } from "./helpers/notion.js";
+import { execFile } from "child_process";
+import { promisify } from "util";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+const execFileAsync = promisify(execFile);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const languagePair = new Configstore("language-config-pair");
 const history = new Configstore("translate-history");
@@ -97,6 +105,44 @@ if (pair) {
       ttsfile: os.tmpdir() + "/" + uuidv4() + ".mp3",
     },
   });
+}
+
+async function validateUrl(url) {
+  try {
+    const response = await fetch(url, {
+      method: "HEAD",
+      redirect: "manual", // Don't follow redirects automatically
+    });
+
+    // If status is 200, the page exists
+    // If status is 3xx (redirect), check where it's redirecting to
+    if (response.status === 200) {
+      return true;
+    } else if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      // If redirecting to base dictionary path, word doesn't exist
+      const exists = location && !location.endsWith("/english-spanish/");
+      return exists;
+    }
+
+    return false;
+  } catch (error) {
+    return false;
+  }
+}
+
+async function extractPronunciation(url) {
+  try {
+    const scriptPath = join(__dirname, "scripts", "extract_audio.sh");
+    const { stdout } = await execFileAsync(scriptPath, [url]);
+    const jsonOutput = stdout.trim();
+
+    // Parse and return the JSON array
+    const pronunciations = JSON.parse(jsonOutput);
+    return pronunciations;
+  } catch (error) {
+    return null;
+  }
 }
 
 function doTranslate(opts) {
@@ -228,36 +274,48 @@ function doTranslate(opts) {
       return res;
     })
     .then((res) => {
-      // // tts
+      // tts
       if (g_config.voice === "remote") {
-        // var fromArray = [];
-        // res.from.text.array.forEach((o) =>
-        //   tts.split(o).forEach((t) => fromArray.push(t))
-        // );
-        // tts.multi(fromArray, {
-        //   to: res.from.language.iso,
-        //   domain: g_config.domain,
-        //   file: res.from.language.ttsfile,
-        //   client: "gtx",
-        //   agent: g_config.agent,
-        //   responseType: "buffer",
-        // });
-        // var toArray = [];
-        // res.to.text.array.forEach((o) =>
-        //   tts.split(o).forEach((t) => toArray.push(t))
-        // );
-        // tts.multi(toArray, {
-        //   to: res.to.language.iso,
-        //   domain: g_config.domain,
-        //   file: res.to.language.ttsfile,
-        //   client: "gtx",
-        //   agent: g_config.agent,
-        // });
+        var fromArray = [];
+        res.from.text.array.forEach((o) =>
+          tts.split(o).forEach((t) => fromArray.push(t))
+        );
+        tts.multi(fromArray, {
+          to: res.from.language.iso,
+          domain: g_config.domain,
+          file: res.from.language.ttsfile,
+          client: "gtx",
+          agent: g_config.agent,
+          responseType: "buffer",
+        });
+        var toArray = [];
+        res.to.text.array.forEach((o) =>
+          tts.split(o).forEach((t) => toArray.push(t))
+        );
+        tts.multi(toArray, {
+          to: res.to.language.iso,
+          domain: g_config.domain,
+          file: res.to.language.ttsfile,
+          client: "gtx",
+          agent: g_config.agent,
+        });
       }
+
+      return res;
     })
-    .then((res) => {
-      // notion
-      var emoji = "📝";
+    .then(async (res) => {
+      // Filter out translations with more than 10 words to not include them in notion
+      if (alfy.input.split(" ").length > 10) {
+        return;
+      }
+
+      const cambridgeUrl = `https://dictionary.cambridge.org/dictionary/english-spanish/${encodeURIComponent(alfy.input)}`;
+
+      // Check if Cambridge link exists only for translations shorter than 3 words
+      const wordCount = alfy.input.split(" ").length;
+      const linkExists =
+        wordCount <= 3 ? await validateUrl(cambridgeUrl) : false;
+
       var properties = {
         Word: {
           title: [
@@ -274,19 +332,41 @@ function doTranslate(opts) {
             name: "New",
           },
         },
-        CambridgeLink: {
+      };
+
+      // Only add Cambridge link if it exists
+      if (linkExists) {
+        properties.CambridgeLink = {
           rich_text: [
             {
               text: {
-                content: `https://dictionary.cambridge.org/dictionary/english-spanish/${encodeURIComponent(alfy.input)}`,
+                content: cambridgeUrl,
                 link: {
-                  url: `https://dictionary.cambridge.org/dictionary/english-spanish/${encodeURIComponent(alfy.input)}`,
+                  url: cambridgeUrl,
                 },
               },
             },
           ],
-        },
-      };
-      createPage(emoji, properties);
+        };
+      }
+
+      // Create the page first
+      createPage(properties)
+        .then(async (page) => {
+          // If we have a Cambridge link and the page was created successfully, add content
+          if (linkExists && page && page.id) {
+            // Wait a bit for the page/template to be fully initialized
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            // Extract and add pronunciation
+            const pronunciation = await extractPronunciation(cambridgeUrl);
+            if (pronunciation) {
+              await appendToPage(page.id, pronunciation);
+            }
+          }
+        })
+        .catch((error) => {
+          console.error("Failed to create Notion page:", error.message);
+        });
     });
 }
