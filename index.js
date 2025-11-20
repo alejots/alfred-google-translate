@@ -304,11 +304,17 @@ function doTranslate(opts) {
       return res;
     })
     .then(async (res) => {
-      // notion
+      // Filter out translations with more than 10 words to not include them in notion
+      if (alfy.input.split(" ").length > 10) {
+        return;
+      }
+
       const cambridgeUrl = `https://dictionary.cambridge.org/dictionary/english-spanish/${encodeURIComponent(alfy.input)}`;
 
-      // Check if Cambridge link exists
-      const linkExists = await validateUrl(cambridgeUrl);
+      // Check if Cambridge link exists only for translations shorter than 3 words
+      const wordCount = alfy.input.split(" ").length;
+      const linkExists =
+        wordCount <= 3 ? await validateUrl(cambridgeUrl) : false;
 
       var properties = {
         Word: {
