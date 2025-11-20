@@ -347,10 +347,14 @@ function doTranslate(opts) {
       // Create the page first
       createPage(properties)
         .then(async (page) => {
-          // If we have pronunciation and the page was created successfully, append it to the page content
-          if (linkExists) {
+          // If we have a Cambridge link and the page was created successfully, add content
+          if (linkExists && page && page.id) {
+            // Wait a bit for the page/template to be fully initialized
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+
+            // Extract and add pronunciation
             const pronunciation = await extractPronunciation(cambridgeUrl);
-            if (pronunciation && page && page.id) {
+            if (pronunciation) {
               await appendToPage(page.id, pronunciation);
             }
           }
