@@ -274,31 +274,31 @@ function doTranslate(opts) {
       return res;
     })
     .then((res) => {
-      // // tts
+      // tts
       if (g_config.voice === "remote") {
-        // var fromArray = [];
-        // res.from.text.array.forEach((o) =>
-        //   tts.split(o).forEach((t) => fromArray.push(t))
-        // );
-        // tts.multi(fromArray, {
-        //   to: res.from.language.iso,
-        //   domain: g_config.domain,
-        //   file: res.from.language.ttsfile,
-        //   client: "gtx",
-        //   agent: g_config.agent,
-        //   responseType: "buffer",
-        // });
-        // var toArray = [];
-        // res.to.text.array.forEach((o) =>
-        //   tts.split(o).forEach((t) => toArray.push(t))
-        // );
-        // tts.multi(toArray, {
-        //   to: res.to.language.iso,
-        //   domain: g_config.domain,
-        //   file: res.to.language.ttsfile,
-        //   client: "gtx",
-        //   agent: g_config.agent,
-        // });
+        var fromArray = [];
+        res.from.text.array.forEach((o) =>
+          tts.split(o).forEach((t) => fromArray.push(t))
+        );
+        tts.multi(fromArray, {
+          to: res.from.language.iso,
+          domain: g_config.domain,
+          file: res.from.language.ttsfile,
+          client: "gtx",
+          agent: g_config.agent,
+          responseType: "buffer",
+        });
+        var toArray = [];
+        res.to.text.array.forEach((o) =>
+          tts.split(o).forEach((t) => toArray.push(t))
+        );
+        tts.multi(toArray, {
+          to: res.to.language.iso,
+          domain: g_config.domain,
+          file: res.to.language.ttsfile,
+          client: "gtx",
+          agent: g_config.agent,
+        });
       }
 
       return res;
