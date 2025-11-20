@@ -7,7 +7,15 @@ import os from "os";
 import { v4 as uuidv4 } from "uuid";
 import languages from "./languages.js";
 import SocksProxyAgent from "socks-proxy-agent";
-import { createPage } from "./helpers/notion.js";
+import { createPage, appendToPage } from "./helpers/notion.js";
+import { execFile } from "child_process";
+import { promisify } from "util";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
+
+const execFileAsync = promisify(execFile);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const languagePair = new Configstore("language-config-pair");
 const history = new Configstore("translate-history");
@@ -120,6 +128,20 @@ async function validateUrl(url) {
     return false;
   } catch (error) {
     return false;
+  }
+}
+
+async function extractPronunciation(url) {
+  try {
+    const scriptPath = join(__dirname, "scripts", "extract_audio.sh");
+    const { stdout } = await execFileAsync(scriptPath, [url]);
+    const jsonOutput = stdout.trim();
+
+    // Parse and return the JSON array
+    const pronunciations = JSON.parse(jsonOutput);
+    return pronunciations;
+  } catch (error) {
+    return null;
   }
 }
 
@@ -322,8 +344,19 @@ function doTranslate(opts) {
         };
       }
 
-      createPage(properties).catch((error) => {
-        console.error("Failed to create Notion page:", error.message);
-      });
+      // Create the page first
+      createPage(properties)
+        .then(async (page) => {
+          // If we have pronunciation and the page was created successfully, append it to the page content
+          if (linkExists) {
+            const pronunciation = await extractPronunciation(cambridgeUrl);
+            if (pronunciation && page && page.id) {
+              await appendToPage(page.id, pronunciation);
+            }
+          }
+        })
+        .catch((error) => {
+          console.error("Failed to create Notion page:", error.message);
+        });
     });
 }

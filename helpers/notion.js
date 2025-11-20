@@ -24,3 +24,70 @@ export const createPage = async (properties) => {
     throw error;
   }
 };
+
+export const appendToPage = async (pageId, pronunciations) => {
+  try {
+    const children = [];
+
+    // Add "Pronunciation:" header
+    children.push({
+      object: "block",
+      type: "paragraph",
+      paragraph: {
+        rich_text: [
+          {
+            type: "text",
+            text: { content: "Pronunciation:" },
+            annotations: { bold: true },
+          },
+        ],
+      },
+    });
+
+    // Add each pronunciation with audio
+    for (const item of pronunciations) {
+      // Add region and IPA
+      children.push({
+        object: "block",
+        type: "paragraph",
+        paragraph: {
+          rich_text: [
+            {
+              type: "text",
+              text: { content: item.region },
+              annotations: { bold: true },
+            },
+            {
+              type: "text",
+              text: { content: `: /${item.ipa}/` },
+            },
+          ],
+        },
+      });
+
+      // Add audio block if available
+      if (item.audioUrl) {
+        children.push({
+          object: "block",
+          type: "audio",
+          audio: {
+            type: "external",
+            external: {
+              url: item.audioUrl,
+            },
+          },
+        });
+      }
+    }
+
+    const response = await notion.blocks.children.append({
+      block_id: pageId,
+      children: children,
+    });
+
+    return response;
+  } catch (error) {
+    console.error("Error appending to Notion page:", error.message);
+    throw error;
+  }
+};
