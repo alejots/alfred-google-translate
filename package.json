@@ -37,7 +37,7 @@
     "alfy"
   ],
   "dependencies": {
-    "@notionhq/client": "^2.1.1",
+    "@notionhq/client": "^5.4.0",
     "alfy": "^2.0.0",
     "configstore": "^6.0.0",
     "got": "^14.0.0",
