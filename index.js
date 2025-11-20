@@ -257,7 +257,6 @@ function doTranslate(opts) {
     })
     .then((res) => {
       // notion
-      var emoji = "📝";
       var properties = {
         Word: {
           title: [
@@ -287,6 +286,8 @@ function doTranslate(opts) {
           ],
         },
       };
-      createPage(emoji, properties);
+      createPage(properties).catch((error) => {
+        console.error("Failed to create Notion page:", error.message);
+      });
     });
 }
