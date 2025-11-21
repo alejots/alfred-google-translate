@@ -1,9 +1,29 @@
 import { Client } from "@notionhq/client";
+import { readFileSync } from "fs";
+import { fileURLToPath } from "url";
+import { dirname, join } from "path";
 
-import config from "../config.json" assert { type: "json" };
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Get credentials from environment variables or config.json
+let token = process.env.notion_token;
+let database_id = process.env.notion_database_id;
+
+// Fallback to config.json if environment variables are not set
+if (!token || !database_id) {
+  try {
+    const configPath = join(__dirname, "..", "config.json");
+    const config = JSON.parse(readFileSync(configPath, "utf8"));
+    token = token || config.token;
+    database_id = database_id || config.database_id;
+  } catch (error) {
+    console.log("No config.json found, using environment variables only");
+  }
+}
 
 const notion = new Client({
-  auth: config.token,
+  auth: token,
 });
 
 export const createPage = async (properties) => {
@@ -11,7 +31,7 @@ export const createPage = async (properties) => {
     const response = await notion.pages.create({
       parent: {
         type: "database_id",
-        database_id: config.database_id,
+        database_id: database_id,
       },
       properties,
       template: {
