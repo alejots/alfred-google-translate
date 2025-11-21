@@ -1,20 +1,20 @@
 {
   "type": "module",
-  "name": "alfred-google-translate",
-  "version": "2.0.9",
-  "description": "Alfred 3 workflow to translate with google translate api",
+  "name": "alfred-translate-to-notion",
+  "version": "1.0.1",
+  "description": "Alfred to translate with google translate and add to Notion database",
   "license": "MIT",
-  "repository": "xfslove/alfred-google-translate",
+  "repository": "alejots/alfred-google-translate",
   "author": {
-    "name": "hanwen.huang",
-    "email": "xfslove@gmail.com",
-    "url": "https://github.com/xfslove/alfred-google-translate"
+    "name": "alejots",
+    "email": "alejandro.tunaroza@gmail.com",
+    "url": "https://github.com/alejots/alfred-google-translate"
   },
   "engines": {
     "node": ">=8"
   },
   "scripts": {
-    "test": "xo && ava",
+    "build": "./build.sh",
     "postinstall": "alfy-init",
     "preuninstall": "alfy-cleanup"
   },
@@ -26,7 +26,10 @@
     "index.js",
     "icon.png",
     "tts.png",
-    "info.plist"
+    "info.plist",
+    "config.example.json",
+    "helpers/",
+    "scripts/"
   ],
   "keywords": [
     "translate",
@@ -34,7 +37,8 @@
     "alfred",
     "alfred-workflow",
     "workflow",
-    "alfy"
+    "alfy",
+    "notion"
   ],
   "dependencies": {
     "@notionhq/client": "^5.4.0",
@@ -44,13 +48,5 @@
     "socks-proxy-agent": "^8.0.2",
     "uuid": "^9.0.1"
   },
-  "devDependencies": {
-    "alfy-test": "^0.4.2",
-    "ava": "6.0.1",
-    "codecov": "^3.8.3",
-    "coveralls": "^3.1.1",
-    "nyc": "^15.1.0",
-    "puppeteer": "^21.7.0",
-    "xo": "0.56.0"
-  }
+  "devDependencies": {}
 }

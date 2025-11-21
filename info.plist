@@ -133,7 +133,17 @@ fi</string>
 				<key>runningsubtext</key>
 				<string>Translating...</string>
 				<key>script</key>
-				<string> NODE_OPTIONS="--no-deprecation" ./node_modules/.bin/run-node index.js "$1" </string>
+				<string># Source nvm to ensure node is available
+if [ -s "$HOME/.nvm/nvm.sh" ]; then
+    export NVM_DIR="$HOME/.nvm"
+    . "$NVM_DIR/nvm.sh"
+fi
+
+# Add common paths
+export PATH="/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
+export NODE_OPTIONS="--no-deprecation"
+node index.js "$1"</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
 				<key>scriptfile</key>
@@ -156,7 +166,25 @@ fi</string>
 		</dict>
 	</array>
 	<key>readme</key>
-	<string></string>
+	<string>## Alfred Translate to Notion
+
+Translates text using Google Translate and automatically saves translations to a Notion database.
+
+### Setup
+
+1. Install dependencies: `yarn install`
+2. Configure your Notion integration:
+   - Create a Notion integration at https://www.notion.so/my-integrations
+   - Create a database with `Word` (Title) and `Status` (Status) properties
+   - Share the database with your integration
+   - Enter your credentials in the workflow configuration below
+
+### Usage
+
+- Keyword: `tr [word or sentence]`
+- Hotkey: ⌃T (configurable)
+
+For more details, visit: https://github.com/alejots/alfred-google-translate</string>
 	<key>uidata</key>
 	<dict>
 		<key>287F7DE4-2A8A-4356-9659-797E2F2AE72A</key>
@@ -182,9 +210,52 @@ fi</string>
 		</dict>
 	</dict>
 	<key>userconfigurationconfig</key>
-	<array/>
+	<array>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string></string>
+				<key>placeholder</key>
+				<string>secret_xxxxxxxxxxxxx</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Your Notion API integration token (get it from https://www.notion.so/my-integrations)</string>
+			<key>label</key>
+			<string>Notion API Token</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>notion_token</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string></string>
+				<key>placeholder</key>
+				<string>xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx</string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Your Notion database ID (found in the database URL)</string>
+			<key>label</key>
+			<string>Notion Database ID</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>notion_database_id</string>
+		</dict>
+	</array>
 	<key>version</key>
-	<string></string>
+	<string>1.0.1</string>
 	<key>webaddress</key>
 	<string>https://github.com/alejots/alfred-google-translate/</string>
 </dict>

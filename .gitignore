@@ -1,6 +1,11 @@
 node_modules
 .idea
-package-lock.json
+.vscode
+.DS_Store
 
-# Config file
+# Config files with credentials
 config.json
+prefs.plist
+
+# Build artifacts
+build/
