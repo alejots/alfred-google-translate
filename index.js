@@ -263,8 +263,14 @@ function doTranslate(opts) {
       res.from.language.ttsfile = opts.from.ttsfile;
       res.to.language = { iso: opts.to.language, ttsfile: opts.to.ttsfile };
 
-      // Start Notion page creation in the background (non-blocking)
-      // Don't await - let it run independently
+      // Start both TTS and Notion page creation in the background (non-blocking)
+      // Don't await - let them run independently
+      if (g_config.voice === "remote") {
+        generateTTSInBackground(res).catch((error) => {
+          console.error("Background TTS generation failed:", error.message);
+        });
+      }
+
       createNotionPageInBackground(res, opts).catch((error) => {
         console.error("Background Notion creation failed:", error.message);
       });
@@ -288,37 +294,34 @@ function doTranslate(opts) {
       }
 
       return res;
-    })
-    .then((res) => {
-      // tts
-      if (g_config.voice === "remote") {
-        var fromArray = [];
-        res.from.text.array.forEach((o) =>
-          tts.split(o).forEach((t) => fromArray.push(t))
-        );
-        tts.multi(fromArray, {
-          to: res.from.language.iso,
-          domain: g_config.domain,
-          file: res.from.language.ttsfile,
-          client: "gtx",
-          agent: g_config.agent,
-          responseType: "buffer",
-        });
-        var toArray = [];
-        res.to.text.array.forEach((o) =>
-          tts.split(o).forEach((t) => toArray.push(t))
-        );
-        tts.multi(toArray, {
-          to: res.to.language.iso,
-          domain: g_config.domain,
-          file: res.to.language.ttsfile,
-          client: "gtx",
-          agent: g_config.agent,
-        });
-      }
-
-      return res;
     });
+}
+
+// Background function to generate TTS without blocking
+async function generateTTSInBackground(res) {
+  var fromArray = [];
+  res.from.text.array.forEach((o) =>
+    tts.split(o).forEach((t) => fromArray.push(t))
+  );
+  tts.multi(fromArray, {
+    to: res.from.language.iso,
+    domain: g_config.domain,
+    file: res.from.language.ttsfile,
+    client: "gtx",
+    agent: g_config.agent,
+    responseType: "buffer",
+  });
+  var toArray = [];
+  res.to.text.array.forEach((o) =>
+    tts.split(o).forEach((t) => toArray.push(t))
+  );
+  tts.multi(toArray, {
+    to: res.to.language.iso,
+    domain: g_config.domain,
+    file: res.to.language.ttsfile,
+    client: "gtx",
+    agent: g_config.agent,
+  });
 }
 
 // Background function to create Notion page without blocking Alfred results
