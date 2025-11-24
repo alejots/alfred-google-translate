@@ -262,6 +262,13 @@ function doTranslate(opts) {
 
       res.from.language.ttsfile = opts.from.ttsfile;
       res.to.language = { iso: opts.to.language, ttsfile: opts.to.ttsfile };
+
+      // Start Notion page creation in the background (non-blocking)
+      // Don't await - let it run independently
+      createNotionPageInBackground(res, opts).catch((error) => {
+        console.error("Background Notion creation failed:", error.message);
+      });
+
       return res;
     })
     .then((res) => {
@@ -311,73 +318,74 @@ function doTranslate(opts) {
       }
 
       return res;
-    })
-    .then(async (res) => {
-      // Filter out translations with more than 10 words to not include them in notion
-      if (alfy.input.split(" ").length > 10) {
-        return;
-      }
+    });
+}
 
-      const cambridgeUrl = `https://dictionary.cambridge.org/dictionary/english-spanish/${encodeURIComponent(
-        alfy.input
-      )}`;
+// Background function to create Notion page without blocking Alfred results
+async function createNotionPageInBackground(res, opts) {
+  // Filter out translations with more than 10 words
+  if (alfy.input.split(" ").length > 10) {
+    return;
+  }
 
-      // Check if Cambridge link exists only for translations shorter than 3 words
-      const wordCount = alfy.input.split(" ").length;
-      const linkExists =
-        wordCount <= 3 ? await validateUrl(cambridgeUrl) : false;
+  const cambridgeUrl = `https://dictionary.cambridge.org/dictionary/english-spanish/${encodeURIComponent(
+    alfy.input
+  )}`;
 
-      var properties = {
-        Word: {
-          title: [
-            {
-              text: {
-                content: alfy.input,
-              },
-            },
-          ],
-        },
-        Status: {
-          type: "status",
-          status: {
-            name: "New",
+  // Check if Cambridge link exists only for translations shorter than 3 words
+  const wordCount = alfy.input.split(" ").length;
+  const linkExists = wordCount <= 3 ? await validateUrl(cambridgeUrl) : false;
+
+  var properties = {
+    Word: {
+      title: [
+        {
+          text: {
+            content: alfy.input,
           },
         },
-      };
+      ],
+    },
+    Status: {
+      type: "status",
+      status: {
+        name: "New",
+      },
+    },
+  };
 
-      // Only add Cambridge link if it exists
-      if (linkExists) {
-        properties.CambridgeLink = {
-          rich_text: [
-            {
-              text: {
-                content: cambridgeUrl,
-                link: {
-                  url: cambridgeUrl,
-                },
-              },
+  // Only add Cambridge link if it exists
+  if (linkExists) {
+    properties.CambridgeLink = {
+      rich_text: [
+        {
+          text: {
+            content: cambridgeUrl,
+            link: {
+              url: cambridgeUrl,
             },
-          ],
-        };
+          },
+        },
+      ],
+    };
+  }
+
+  // Create the page first
+  try {
+    const page = await createPage(properties);
+
+    // If we have a Cambridge link and the page was created successfully, add content
+    if (linkExists && page && page.id) {
+      // Wait a bit for the page/template to be fully initialized
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Extract and add pronunciation and senses
+      const cambridgeData = await extractCambridgeData(cambridgeUrl);
+      if (cambridgeData) {
+        await appendToPage(page.id, cambridgeData);
       }
-
-      // Create the page first
-      createPage(properties)
-        .then(async (page) => {
-          // If we have a Cambridge link and the page was created successfully, add content
-          if (linkExists && page && page.id) {
-            // Wait a bit for the page/template to be fully initialized
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-
-            // Extract and add pronunciation and senses
-            const cambridgeData = await extractCambridgeData(cambridgeUrl);
-            if (cambridgeData) {
-              await appendToPage(page.id, cambridgeData);
-            }
-          }
-        })
-        .catch((error) => {
-          console.error("Failed to create Notion page:", error.message);
-        });
-    });
+    }
+  } catch (error) {
+    console.error("Failed to create Notion page:", error.message);
+  }
 }
