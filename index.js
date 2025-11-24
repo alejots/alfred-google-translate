@@ -32,11 +32,12 @@ var g_config = {
 var pair = languagePair.get("pair");
 
 if (pair) {
-  // auto
+  // Language pair mode - use auto detection with target language
   var pair0 = pair[0];
   var pair1 = pair[1];
 
   if (pair0 === "auto" || pair1 === "auto") {
+    // One language is auto, translate to the non-auto language
     doTranslate({
       text: alfy.input,
       from: {
@@ -44,44 +45,25 @@ if (pair) {
         ttsfile: os.tmpdir() + "/" + uuidv4() + ".mp3",
       },
       to: {
-        language: "en",
+        language: pair0 === "auto" ? pair1 : pair0,
         ttsfile: os.tmpdir() + "/" + uuidv4() + ".mp3",
       },
     });
   } else {
-    // language detect
-    translator
-      .translate(alfy.input, {
-        from: "auto",
-        to: "en",
-        domain: g_config.domain,
-        client: "gtx",
-        agent: g_config.agent,
-      })
-      .then(function (res) {
-        var detect = res.from.language.iso;
-        var from = "auto";
-        var to = "en";
-        if (pair0 === detect) {
-          from = pair0;
-          to = pair1;
-        } else if (pair1 === detect) {
-          from = pair1;
-          to = pair0;
-        }
-
-        doTranslate({
-          text: alfy.input,
-          from: {
-            language: from,
-            ttsfile: os.tmpdir() + "/" + uuidv4() + ".mp3",
-          },
-          to: {
-            language: to,
-            ttsfile: os.tmpdir() + "/" + uuidv4() + ".mp3",
-          },
-        });
-      });
+    // Both languages specified - use auto detection
+    // The API will detect the language and translate to the appropriate target
+    // We'll use the first language in the pair as the primary target
+    doTranslate({
+      text: alfy.input,
+      from: {
+        language: "auto",
+        ttsfile: os.tmpdir() + "/" + uuidv4() + ".mp3",
+      },
+      to: {
+        language: pair1,
+        ttsfile: os.tmpdir() + "/" + uuidv4() + ".mp3",
+      },
+    });
   }
 } else {
   // manual
@@ -158,8 +140,8 @@ function doTranslate(opts) {
     .then(function (res) {
       var items = [];
 
-      if ("auto" === opts.from.language || res.from.language.didYouMean) {
-        // Detected the input language not in configuration
+      if (res.from.language.didYouMean) {
+        // Language detection is uncertain
         items.push({
           title: res.to.text.value,
           subtitle: `Detected the input language is ${
