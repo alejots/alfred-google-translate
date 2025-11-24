@@ -131,16 +131,17 @@ async function validateUrl(url) {
   }
 }
 
-async function extractPronunciation(url) {
+async function extractCambridgeData(url) {
   try {
-    const scriptPath = join(__dirname, "scripts", "extract_audio.sh");
-    const { stdout } = await execFileAsync(scriptPath, [url]);
+    const scriptPath = join(__dirname, "scripts", "extract_senses.js");
+    const { stdout } = await execFileAsync("node", [scriptPath, url]);
     const jsonOutput = stdout.trim();
 
-    // Parse and return the JSON array
-    const pronunciations = JSON.parse(jsonOutput);
-    return pronunciations;
+    // Parse and return the JSON object with pronunciations and senses
+    const data = JSON.parse(jsonOutput);
+    return data;
   } catch (error) {
+    console.error("Error extracting Cambridge data:", error);
     return null;
   }
 }
@@ -161,7 +162,9 @@ function doTranslate(opts) {
         // Detected the input language not in configuration
         items.push({
           title: res.to.text.value,
-          subtitle: `Detected the input language is ${languages[res.from.language.iso]}, not one of your configuration.`,
+          subtitle: `Detected the input language is ${
+            languages[res.from.language.iso]
+          }, not one of your configuration.`,
         });
       } else if (
         res.from.corrected.corrected ||
@@ -184,13 +187,15 @@ function doTranslate(opts) {
           g_config.voice === "remote"
             ? opts.from.ttsfile
             : g_config.voice === "local"
-              ? fromText
-              : "";
+            ? fromText
+            : "";
         // Input
         items.push({
           title: fromText,
           subtitle: `Phonetic: ${fromPhonetic}`,
-          quicklookurl: `${g_config.domain}/#view=home&op=translate&sl=${opts.from.language}&tl=${opts.to.language}&text=${encodeURIComponent(fromText)}`,
+          quicklookurl: `${g_config.domain}/#view=home&op=translate&sl=${
+            opts.from.language
+          }&tl=${opts.to.language}&text=${encodeURIComponent(fromText)}`,
           arg: fromArg,
           text: {
             copy: fromText,
@@ -207,13 +212,15 @@ function doTranslate(opts) {
           g_config.voice === "remote"
             ? opts.to.ttsfile
             : g_config.voice === "local"
-              ? toText
-              : "";
+            ? toText
+            : "";
         // Translation
         items.push({
           title: toText,
           subtitle: `Phonetic: ${toPhonetic}`,
-          quicklookurl: `${g_config.domain}/#view=home&op=translate&sl=${opts.to.language}&tl=${opts.from.language}&text=${encodeURIComponent(toText)}`,
+          quicklookurl: `${g_config.domain}/#view=home&op=translate&sl=${
+            opts.to.language
+          }&tl=${opts.from.language}&text=${encodeURIComponent(toText)}`,
           arg: toArg,
           text: {
             copy: toText,
@@ -240,7 +247,9 @@ function doTranslate(opts) {
         res.to.translations.forEach((translation) => {
           items.push({
             title: `Translation[${translation.partsOfSpeech}]: ${translation.value}`,
-            subtitle: `Frequency: ${translation.frequency.toFixed(4)} Synonyms: ${translation.synonyms}`,
+            subtitle: `Frequency: ${translation.frequency.toFixed(
+              4
+            )} Synonyms: ${translation.synonyms}`,
             text: {
               copy: translation.value,
               largetype: `Translation: ${translation.value}\n\nSynonyms: ${translation.synonyms}`,
@@ -309,7 +318,9 @@ function doTranslate(opts) {
         return;
       }
 
-      const cambridgeUrl = `https://dictionary.cambridge.org/dictionary/english-spanish/${encodeURIComponent(alfy.input)}`;
+      const cambridgeUrl = `https://dictionary.cambridge.org/dictionary/english-spanish/${encodeURIComponent(
+        alfy.input
+      )}`;
 
       // Check if Cambridge link exists only for translations shorter than 3 words
       const wordCount = alfy.input.split(" ").length;
@@ -358,10 +369,10 @@ function doTranslate(opts) {
             // Wait a bit for the page/template to be fully initialized
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
-            // Extract and add pronunciation
-            const pronunciation = await extractPronunciation(cambridgeUrl);
-            if (pronunciation) {
-              await appendToPage(page.id, pronunciation);
+            // Extract and add pronunciation and senses
+            const cambridgeData = await extractCambridgeData(cambridgeUrl);
+            if (cambridgeData) {
+              await appendToPage(page.id, cambridgeData);
             }
           }
         })

@@ -45,8 +45,8 @@
     "alfy": "^2.0.0",
     "configstore": "^6.0.0",
     "got": "^14.0.0",
+    "jsdom": "^27.2.0",
     "socks-proxy-agent": "^8.0.2",
     "uuid": "^9.0.1"
-  },
-  "devDependencies": {}
+  }
 }
