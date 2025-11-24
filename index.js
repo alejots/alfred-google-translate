@@ -32,11 +32,12 @@ var g_config = {
 var pair = languagePair.get("pair");
 
 if (pair) {
-  // auto
+  // Language pair mode - use auto detection with target language
   var pair0 = pair[0];
   var pair1 = pair[1];
 
   if (pair0 === "auto" || pair1 === "auto") {
+    // One language is auto, translate to the non-auto language
     doTranslate({
       text: alfy.input,
       from: {
@@ -44,44 +45,25 @@ if (pair) {
         ttsfile: os.tmpdir() + "/" + uuidv4() + ".mp3",
       },
       to: {
-        language: "en",
+        language: pair0 === "auto" ? pair1 : pair0,
         ttsfile: os.tmpdir() + "/" + uuidv4() + ".mp3",
       },
     });
   } else {
-    // language detect
-    translator
-      .translate(alfy.input, {
-        from: "auto",
-        to: "en",
-        domain: g_config.domain,
-        client: "gtx",
-        agent: g_config.agent,
-      })
-      .then(function (res) {
-        var detect = res.from.language.iso;
-        var from = "auto";
-        var to = "en";
-        if (pair0 === detect) {
-          from = pair0;
-          to = pair1;
-        } else if (pair1 === detect) {
-          from = pair1;
-          to = pair0;
-        }
-
-        doTranslate({
-          text: alfy.input,
-          from: {
-            language: from,
-            ttsfile: os.tmpdir() + "/" + uuidv4() + ".mp3",
-          },
-          to: {
-            language: to,
-            ttsfile: os.tmpdir() + "/" + uuidv4() + ".mp3",
-          },
-        });
-      });
+    // Both languages specified - use auto detection
+    // The API will detect the language and translate to the appropriate target
+    // We'll use the first language in the pair as the primary target
+    doTranslate({
+      text: alfy.input,
+      from: {
+        language: "auto",
+        ttsfile: os.tmpdir() + "/" + uuidv4() + ".mp3",
+      },
+      to: {
+        language: pair1,
+        ttsfile: os.tmpdir() + "/" + uuidv4() + ".mp3",
+      },
+    });
   }
 } else {
   // manual
@@ -131,16 +113,17 @@ async function validateUrl(url) {
   }
 }
 
-async function extractPronunciation(url) {
+async function extractCambridgeData(url) {
   try {
-    const scriptPath = join(__dirname, "scripts", "extract_audio.sh");
-    const { stdout } = await execFileAsync(scriptPath, [url]);
+    const scriptPath = join(__dirname, "scripts", "extract_senses.js");
+    const { stdout } = await execFileAsync("node", [scriptPath, url]);
     const jsonOutput = stdout.trim();
 
-    // Parse and return the JSON array
-    const pronunciations = JSON.parse(jsonOutput);
-    return pronunciations;
+    // Parse and return the JSON object with pronunciations and senses
+    const data = JSON.parse(jsonOutput);
+    return data;
   } catch (error) {
+    console.error("Error extracting Cambridge data:", error);
     return null;
   }
 }
@@ -157,11 +140,13 @@ function doTranslate(opts) {
     .then(function (res) {
       var items = [];
 
-      if ("auto" === opts.from.language || res.from.language.didYouMean) {
-        // Detected the input language not in configuration
+      if (res.from.language.didYouMean) {
+        // Language detection is uncertain
         items.push({
           title: res.to.text.value,
-          subtitle: `Detected the input language is ${languages[res.from.language.iso]}, not one of your configuration.`,
+          subtitle: `Detected the input language is ${
+            languages[res.from.language.iso]
+          }, not one of your configuration.`,
         });
       } else if (
         res.from.corrected.corrected ||
@@ -184,13 +169,15 @@ function doTranslate(opts) {
           g_config.voice === "remote"
             ? opts.from.ttsfile
             : g_config.voice === "local"
-              ? fromText
-              : "";
+            ? fromText
+            : "";
         // Input
         items.push({
           title: fromText,
           subtitle: `Phonetic: ${fromPhonetic}`,
-          quicklookurl: `${g_config.domain}/#view=home&op=translate&sl=${opts.from.language}&tl=${opts.to.language}&text=${encodeURIComponent(fromText)}`,
+          quicklookurl: `${g_config.domain}/#view=home&op=translate&sl=${
+            opts.from.language
+          }&tl=${opts.to.language}&text=${encodeURIComponent(fromText)}`,
           arg: fromArg,
           text: {
             copy: fromText,
@@ -207,13 +194,15 @@ function doTranslate(opts) {
           g_config.voice === "remote"
             ? opts.to.ttsfile
             : g_config.voice === "local"
-              ? toText
-              : "";
+            ? toText
+            : "";
         // Translation
         items.push({
           title: toText,
           subtitle: `Phonetic: ${toPhonetic}`,
-          quicklookurl: `${g_config.domain}/#view=home&op=translate&sl=${opts.to.language}&tl=${opts.from.language}&text=${encodeURIComponent(toText)}`,
+          quicklookurl: `${g_config.domain}/#view=home&op=translate&sl=${
+            opts.to.language
+          }&tl=${opts.from.language}&text=${encodeURIComponent(toText)}`,
           arg: toArg,
           text: {
             copy: toText,
@@ -240,7 +229,9 @@ function doTranslate(opts) {
         res.to.translations.forEach((translation) => {
           items.push({
             title: `Translation[${translation.partsOfSpeech}]: ${translation.value}`,
-            subtitle: `Frequency: ${translation.frequency.toFixed(4)} Synonyms: ${translation.synonyms}`,
+            subtitle: `Frequency: ${translation.frequency.toFixed(
+              4
+            )} Synonyms: ${translation.synonyms}`,
             text: {
               copy: translation.value,
               largetype: `Translation: ${translation.value}\n\nSynonyms: ${translation.synonyms}`,
@@ -253,6 +244,19 @@ function doTranslate(opts) {
 
       res.from.language.ttsfile = opts.from.ttsfile;
       res.to.language = { iso: opts.to.language, ttsfile: opts.to.ttsfile };
+
+      // Start both TTS and Notion page creation in the background (non-blocking)
+      // Don't await - let them run independently
+      if (g_config.voice === "remote") {
+        generateTTSInBackground(res).catch((error) => {
+          console.error("Background TTS generation failed:", error.message);
+        });
+      }
+
+      createNotionPageInBackground(res, opts).catch((error) => {
+        console.error("Background Notion creation failed:", error.message);
+      });
+
       return res;
     })
     .then((res) => {
@@ -272,101 +276,101 @@ function doTranslate(opts) {
       }
 
       return res;
-    })
-    .then((res) => {
-      // tts
-      if (g_config.voice === "remote") {
-        var fromArray = [];
-        res.from.text.array.forEach((o) =>
-          tts.split(o).forEach((t) => fromArray.push(t))
-        );
-        tts.multi(fromArray, {
-          to: res.from.language.iso,
-          domain: g_config.domain,
-          file: res.from.language.ttsfile,
-          client: "gtx",
-          agent: g_config.agent,
-          responseType: "buffer",
-        });
-        var toArray = [];
-        res.to.text.array.forEach((o) =>
-          tts.split(o).forEach((t) => toArray.push(t))
-        );
-        tts.multi(toArray, {
-          to: res.to.language.iso,
-          domain: g_config.domain,
-          file: res.to.language.ttsfile,
-          client: "gtx",
-          agent: g_config.agent,
-        });
-      }
+    });
+}
 
-      return res;
-    })
-    .then(async (res) => {
-      // Filter out translations with more than 10 words to not include them in notion
-      if (alfy.input.split(" ").length > 10) {
-        return;
-      }
+// Background function to generate TTS without blocking
+async function generateTTSInBackground(res) {
+  var fromArray = [];
+  res.from.text.array.forEach((o) =>
+    tts.split(o).forEach((t) => fromArray.push(t))
+  );
+  tts.multi(fromArray, {
+    to: res.from.language.iso,
+    domain: g_config.domain,
+    file: res.from.language.ttsfile,
+    client: "gtx",
+    agent: g_config.agent,
+    responseType: "buffer",
+  });
+  var toArray = [];
+  res.to.text.array.forEach((o) =>
+    tts.split(o).forEach((t) => toArray.push(t))
+  );
+  tts.multi(toArray, {
+    to: res.to.language.iso,
+    domain: g_config.domain,
+    file: res.to.language.ttsfile,
+    client: "gtx",
+    agent: g_config.agent,
+  });
+}
 
-      const cambridgeUrl = `https://dictionary.cambridge.org/dictionary/english-spanish/${encodeURIComponent(alfy.input)}`;
+// Background function to create Notion page without blocking Alfred results
+async function createNotionPageInBackground(res, opts) {
+  // Filter out translations with more than 10 words
+  if (alfy.input.split(" ").length > 10) {
+    return;
+  }
 
-      // Check if Cambridge link exists only for translations shorter than 3 words
-      const wordCount = alfy.input.split(" ").length;
-      const linkExists =
-        wordCount <= 3 ? await validateUrl(cambridgeUrl) : false;
+  const cambridgeUrl = `https://dictionary.cambridge.org/dictionary/english-spanish/${encodeURIComponent(
+    alfy.input
+  )}`;
 
-      var properties = {
-        Word: {
-          title: [
-            {
-              text: {
-                content: alfy.input,
-              },
-            },
-          ],
-        },
-        Status: {
-          type: "status",
-          status: {
-            name: "New",
+  // Check if Cambridge link exists only for translations shorter than 3 words
+  const wordCount = alfy.input.split(" ").length;
+  const linkExists = wordCount <= 3 ? await validateUrl(cambridgeUrl) : false;
+
+  var properties = {
+    Word: {
+      title: [
+        {
+          text: {
+            content: alfy.input,
           },
         },
-      };
+      ],
+    },
+    Status: {
+      type: "status",
+      status: {
+        name: "New",
+      },
+    },
+  };
 
-      // Only add Cambridge link if it exists
-      if (linkExists) {
-        properties.CambridgeLink = {
-          rich_text: [
-            {
-              text: {
-                content: cambridgeUrl,
-                link: {
-                  url: cambridgeUrl,
-                },
-              },
+  // Only add Cambridge link if it exists
+  if (linkExists) {
+    properties.CambridgeLink = {
+      rich_text: [
+        {
+          text: {
+            content: cambridgeUrl,
+            link: {
+              url: cambridgeUrl,
             },
-          ],
-        };
+          },
+        },
+      ],
+    };
+  }
+
+  // Create the page first
+  try {
+    const page = await createPage(properties);
+
+    // If we have a Cambridge link and the page was created successfully, add content
+    if (linkExists && page && page.id) {
+      // Wait a bit for the page/template to be fully initialized
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Extract and add pronunciation and senses
+      const cambridgeData = await extractCambridgeData(cambridgeUrl);
+      if (cambridgeData) {
+        await appendToPage(page.id, cambridgeData);
       }
-
-      // Create the page first
-      createPage(properties)
-        .then(async (page) => {
-          // If we have a Cambridge link and the page was created successfully, add content
-          if (linkExists && page && page.id) {
-            // Wait a bit for the page/template to be fully initialized
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-
-            // Extract and add pronunciation
-            const pronunciation = await extractPronunciation(cambridgeUrl);
-            if (pronunciation) {
-              await appendToPage(page.id, pronunciation);
-            }
-          }
-        })
-        .catch((error) => {
-          console.error("Failed to create Notion page:", error.message);
-        });
-    });
+    }
+  } catch (error) {
+    console.error("Failed to create Notion page:", error.message);
+  }
 }
