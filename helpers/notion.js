@@ -6,6 +6,14 @@ import { dirname, join } from "path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+function logError(message, error) {
+  const timestamp = new Date().toISOString();
+  console.error(`[${timestamp}] ${message}:`, error?.message || error);
+  if (error?.stack) {
+    console.error(error.stack);
+  }
+}
+
 // Get credentials from environment variables or config.json
 let token = process.env.notion_token;
 let database_id = process.env.notion_database_id;
@@ -18,7 +26,7 @@ if (!token || !database_id) {
     token = token || config.token;
     database_id = database_id || config.database_id;
   } catch (error) {
-    console.log("No config.json found, using environment variables only");
+    logError("No config.json found, using environment variables only", error);
   }
 }
 
@@ -40,8 +48,77 @@ export const createPage = async (properties) => {
     });
     return response;
   } catch (error) {
-    console.error("Error creating Notion page:", error.message);
-    throw error;
+    logError("Error creating Notion page", error);
+    return null;
+  }
+};
+
+export const findAllPagesByWord = async (word) => {
+  try {
+    // Use search API to find pages in the database with matching title
+    const response = await notion.search({
+      query: word,
+      filter: {
+        property: "object",
+        value: "page",
+      },
+      page_size: 100, // Increased to handle more duplicates
+    });
+
+    // Normalize database_id for comparison (remove hyphens)
+    const normalizedDbId = database_id.replace(/-/g, "");
+
+    // Filter results to collect ALL pages in our database with matching Word property
+    const matchingPages = [];
+    for (const page of response.results) {
+      // Get the database ID from parent (could be database_id or data_source_id)
+      const pageDbId = page.parent?.database_id || page.parent?.data_source_id;
+      const normalizedPageDbId = pageDbId?.replace(/-/g, "");
+
+      if (normalizedPageDbId === normalizedDbId) {
+        // Check if the Word property matches exactly
+        const wordProperty = page.properties?.Word;
+        if (wordProperty?.title?.[0]?.plain_text === word) {
+          matchingPages.push(page);
+        }
+      }
+    }
+
+    return matchingPages;
+  } catch (error) {
+    logError("Error finding all Notion pages by word", error);
+    return [];
+  }
+};
+
+export const getLevelValue = async (pageId) => {
+  try {
+    const response = await notion.pages.retrieve({ page_id: pageId });
+
+    // Get Level property value (returns null if not set, or the number value)
+    const levelProperty = response.properties.Level;
+
+    if (!levelProperty || levelProperty.type !== "number") {
+      return null;
+    }
+
+    return levelProperty.number;
+  } catch (error) {
+    logError("Error getting Level property", error);
+    return null;
+  }
+};
+
+export const deletePage = async (pageId) => {
+  try {
+    await notion.pages.update({
+      page_id: pageId,
+      archived: true,
+    });
+    return true;
+  } catch (error) {
+    logError("Error deleting Notion page", error);
+    return false;
   }
 };
 
@@ -411,7 +488,7 @@ export const appendToPage = async (pageId, data) => {
 
     return response;
   } catch (error) {
-    console.error("Error appending to Notion page:", error.message);
-    throw error;
+    logError("Error appending to Notion page", error);
+    return null;
   }
 };
