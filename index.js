@@ -142,7 +142,31 @@ async function extractCambridgeData(url) {
   }
 }
 
-function doTranslate(opts) {
+async function doTranslate(opts) {
+  // Fetch Cambridge Dictionary data first
+  const cambridgeUrl = `https://dictionary.cambridge.org/dictionary/english-spanish/${encodeURIComponent(
+    opts.text
+  )}`;
+  const wordCount = opts.text.split(" ").length;
+
+  // Start fetching Cambridge data in parallel (don't block)
+  let cambridgeDataPromise = Promise.resolve(null);
+
+  if (wordCount <= 3) {
+    cambridgeDataPromise = (async () => {
+      try {
+        const exists = await validateUrl(cambridgeUrl);
+        if (exists) {
+          return await extractCambridgeData(cambridgeUrl);
+        }
+      } catch (error) {
+        logError("Error fetching Cambridge data", error);
+      }
+      return null;
+    })();
+  }
+
+  // Fetch Google Translate results
   translator
     .translate(opts.text, {
       from: opts.from.language,
@@ -151,8 +175,50 @@ function doTranslate(opts) {
       client: "gtx",
       agent: g_config.agent,
     })
-    .then(function (res) {
+    .then(async function (res) {
       var items = [];
+
+      // Wait for Cambridge data if it's still loading
+      const cambridgeData = await cambridgeDataPromise;
+
+      // Add Cambridge Dictionary results FIRST (if available)
+      if (
+        cambridgeData &&
+        cambridgeData.senses &&
+        cambridgeData.senses.length > 0
+      ) {
+        // Add Cambridge Dictionary header
+        items.push({
+          title: "━━━ Cambridge Dictionary ━━━",
+          subtitle: cambridgeData.wordInfo.partOfSpeech
+            ? `Part of Speech: ${cambridgeData.wordInfo.partOfSpeech}`
+            : "Cambridge Dictionary Results",
+          valid: false,
+        });
+
+        // Add only translations from senses
+        cambridgeData.senses.forEach((sense, idx) => {
+          if (sense.translation) {
+            const defTitle = sense.title
+              ? `${idx + 1}. ${sense.title}: ${sense.translation}`
+              : `${idx + 1}. ${sense.translation}`;
+            const defSubtitle = sense.level
+              ? `Level: ${sense.level} | ${sense.definition}`
+              : sense.definition;
+
+            items.push({
+              title: defTitle,
+              subtitle: defSubtitle,
+              text: {
+                copy: sense.translation,
+                largetype: `${sense.translation}\n\n${sense.definition}`,
+              },
+            });
+          }
+        });
+      }
+
+      // Then add Google Translate results
 
       if (res.from.language.didYouMean) {
         // Language detection is uncertain
@@ -177,6 +243,19 @@ function doTranslate(opts) {
           autocomplete: corrected,
         });
       } else {
+        // Add separator for Google Translate (only if we have Cambridge results)
+        if (
+          cambridgeData &&
+          cambridgeData.senses &&
+          cambridgeData.senses.length > 0
+        ) {
+          items.push({
+            title: "━━━ Google Translate ━━━",
+            subtitle: "Google Translate Results",
+            valid: false,
+          });
+        }
+
         var fromPhonetic = res.from.text.phonetic;
         var fromText = res.from.text.value;
         var fromArg =
@@ -322,8 +401,10 @@ async function generateTTSInBackground(res) {
 
 // Background function to create Notion page without blocking Alfred results
 async function createNotionPageInBackground(res, opts) {
+  const wordCount = alfy.input.split(" ").length;
+
   // Filter out translations with more than 10 words
-  if (alfy.input.split(" ").length > 10) {
+  if (wordCount > 10) {
     return;
   }
 
@@ -332,7 +413,6 @@ async function createNotionPageInBackground(res, opts) {
   )}`;
 
   // Check if Cambridge link exists only for translations shorter than 3 words
-  const wordCount = alfy.input.split(" ").length;
   const linkExists = wordCount <= 3 ? await validateUrl(cambridgeUrl) : false;
 
   try {
@@ -357,7 +437,6 @@ async function createNotionPageInBackground(res, opts) {
 
       // All pages have Level = null or 0, delete them all
       for (const page of existingPages) {
-        const levelValue = await getLevelValue(page.id);
         await deletePage(page.id);
       }
     }
