@@ -7,7 +7,13 @@ import os from "os";
 import { v4 as uuidv4 } from "uuid";
 import languages from "./languages.js";
 import SocksProxyAgent from "socks-proxy-agent";
-import { createPage, appendToPage } from "./helpers/notion.js";
+import {
+  createPage,
+  appendToPage,
+  findAllPagesByWord,
+  getLevelValue,
+  deletePage,
+} from "./helpers/notion.js";
 import { execFile } from "child_process";
 import { promisify } from "util";
 import { fileURLToPath } from "url";
@@ -16,6 +22,14 @@ import { dirname, join } from "path";
 const execFileAsync = promisify(execFile);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+function logError(message, error) {
+  const timestamp = new Date().toISOString();
+  console.error(`[${timestamp}] ${message}:`, error?.message || error);
+  if (error?.stack) {
+    console.error(error.stack);
+  }
+}
 
 const languagePair = new Configstore("language-config-pair");
 const history = new Configstore("translate-history");
@@ -123,7 +137,7 @@ async function extractCambridgeData(url) {
     const data = JSON.parse(jsonOutput);
     return data;
   } catch (error) {
-    console.error("Error extracting Cambridge data:", error);
+    logError("Error extracting Cambridge data", error);
     return null;
   }
 }
@@ -249,12 +263,12 @@ function doTranslate(opts) {
       // Don't await - let them run independently
       if (g_config.voice === "remote") {
         generateTTSInBackground(res).catch((error) => {
-          console.error("Background TTS generation failed:", error.message);
+          logError("Background TTS generation failed", error);
         });
       }
 
       createNotionPageInBackground(res, opts).catch((error) => {
-        console.error("Background Notion creation failed:", error.message);
+        logError("Background Notion creation failed", error);
       });
 
       return res;
@@ -321,42 +335,69 @@ async function createNotionPageInBackground(res, opts) {
   const wordCount = alfy.input.split(" ").length;
   const linkExists = wordCount <= 3 ? await validateUrl(cambridgeUrl) : false;
 
-  var properties = {
-    Word: {
-      title: [
-        {
-          text: {
-            content: alfy.input,
-          },
-        },
-      ],
-    },
-    Status: {
-      type: "status",
-      status: {
-        name: "New",
-      },
-    },
-  };
+  try {
+    // Check if pages with this word already exist (find all duplicates)
+    const existingPages = await findAllPagesByWord(alfy.input);
 
-  // Only add Cambridge link if it exists
-  if (linkExists) {
-    properties.CambridgeLink = {
-      rich_text: [
-        {
-          text: {
-            content: cambridgeUrl,
-            link: {
-              url: cambridgeUrl,
+    if (existingPages.length > 0) {
+      // Check if any page has Level > 0
+      let hasHighLevelPage = false;
+      for (const page of existingPages) {
+        const levelValue = await getLevelValue(page.id);
+        if (levelValue !== null && levelValue > 0) {
+          hasHighLevelPage = true;
+          break;
+        }
+      }
+
+      if (hasHighLevelPage) {
+        // At least one page has Level > 0, skip creating/updating
+        return;
+      }
+
+      // All pages have Level = null or 0, delete them all
+      for (const page of existingPages) {
+        const levelValue = await getLevelValue(page.id);
+        await deletePage(page.id);
+      }
+    }
+
+    // Create a new page (either no existing page, or we deleted all old ones)
+    var properties = {
+      Word: {
+        title: [
+          {
+            text: {
+              content: alfy.input,
             },
           },
+        ],
+      },
+      Status: {
+        type: "status",
+        status: {
+          name: "New",
         },
-      ],
+      },
     };
-  }
 
-  // Create the page first
-  try {
+    // Only add Cambridge link if it exists
+    if (linkExists) {
+      properties.CambridgeLink = {
+        rich_text: [
+          {
+            text: {
+              content: cambridgeUrl,
+              link: {
+                url: cambridgeUrl,
+              },
+            },
+          },
+        ],
+      };
+    }
+
+    // Create the page
     const page = await createPage(properties);
 
     // If we have a Cambridge link and the page was created successfully, add content
@@ -371,6 +412,6 @@ async function createNotionPageInBackground(res, opts) {
       }
     }
   } catch (error) {
-    console.error("Failed to create Notion page:", error.message);
+    logError("Failed to create/update Notion page", error);
   }
 }
