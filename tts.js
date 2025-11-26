@@ -2,7 +2,6 @@ import querystring from "querystring";
 import got from "got";
 import fs from "fs";
 import token from "./token.js";
-import languages from "./languages.js";
 
 // copy from https://github.com/zlargon/google-tts/blob/master/example/long-english-characters.js
 // todo: could be optimized

@@ -1,7 +1,6 @@
 import querystring from "querystring";
 import got from "got";
 import token from "./token.js";
-import languages from "./languages.js";
 
 function translate(text, opts) {
   opts = opts || {};
