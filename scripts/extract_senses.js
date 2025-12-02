@@ -151,11 +151,24 @@ senseBlocks.forEach((block, index) => {
   const definition = defElement ? defElement.textContent.trim() : "";
   console.error(`   - Definition: ${definition}`);
 
-  // Extract translation(s) - only from the direct translation span after definition
+  // Extract translation(s) - look in both def-body and trans-block
   const defBlock = block.querySelector(".def-block.ddef_block");
-  const transElements = defBlock
-    ? defBlock.querySelectorAll(".def-body > .trans.dtrans.dtrans-se")
-    : [];
+  let transElements = [];
+
+  if (defBlock) {
+    // First try to find translations in .def-body (for titled senses)
+    transElements = defBlock.querySelectorAll(
+      ".def-body > .trans.dtrans.dtrans-se"
+    );
+
+    // If not found, look in .trans-block (for untitled senses)
+    if (transElements.length === 0) {
+      transElements = defBlock.querySelectorAll(
+        ".trans-block.dtrans-block > .trans.dtrans.dtrans-se"
+      );
+    }
+  }
+
   const translations = Array.from(transElements)
     .map((el) => el.textContent.trim())
     .filter((t) => t);

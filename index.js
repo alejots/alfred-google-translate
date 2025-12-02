@@ -248,7 +248,7 @@ function spawnBackgroundWorker(res, cambridgeUrl, wordCount) {
     },
     notion: {
       enabled: true,
-      word: alfy.input,
+      word: alfy.input.trim().toLowerCase(),
       cambridgeUrl: cambridgeUrl,
       shouldFetchCambridge: wordCount <= 3,
       wordCount: wordCount,
