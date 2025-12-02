@@ -85,25 +85,26 @@ async function createNotionPage(
   try {
     // Check if pages with this word already exist
     const existingPages = await findAllPagesByWord(word);
+    const levelValues = [];
+    let highestLevel = 0;
 
     if (existingPages.length > 0) {
-      // Check if any page has Level > 0
-      let hasHighLevelPage = false;
       for (const page of existingPages) {
         const levelValue = await getLevelValue(page.id);
-        if (levelValue !== null && levelValue > 0) {
-          hasHighLevelPage = true;
-          break;
+        if (levelValue) {
+          levelValues.push(levelValue);
         }
       }
 
-      if (hasHighLevelPage) {
-        return;
-      }
-
-      // All pages have Level = null or 0, delete them all
+      // Delete all existing pages
       for (const page of existingPages) {
         await deletePage(page.id);
+      }
+
+      // Determine the highest level among existing pages
+      if (levelValues.length > 0) {
+        levelValues.sort((a, b) => b - a); // Descending order
+        highestLevel = levelValues[0];
       }
     }
 
@@ -114,7 +115,11 @@ async function createNotionPage(
       },
       Status: {
         type: "status",
-        status: { name: "New" },
+        status: { name: highestLevel > 0 ? "Learning" : "New" },
+      },
+      Level: {
+        type: "number",
+        number: highestLevel,
       },
     };
 
