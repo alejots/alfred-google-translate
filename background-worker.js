@@ -13,6 +13,8 @@ import {
   findAllPagesByWord,
   getLevelValue,
   deletePage,
+  updatePage,
+  clearPageContent,
 } from "./helpers/notion.js";
 import { execFile } from "child_process";
 import { promisify } from "util";
@@ -87,8 +89,10 @@ async function createNotionPage(
     const existingPages = await findAllPagesByWord(word);
     const levelValues = [];
     let highestLevel = 0;
+    let pageToUpdate = null;
 
     if (existingPages.length > 0) {
+      // Collect level values from all existing pages
       for (const page of existingPages) {
         const levelValue = await getLevelValue(page.id);
         if (levelValue) {
@@ -96,20 +100,21 @@ async function createNotionPage(
         }
       }
 
-      // Delete all existing pages
-      for (const page of existingPages) {
-        await deletePage(page.id);
-      }
-
       // Determine the highest level among existing pages
       if (levelValues.length > 0) {
         levelValues.sort((a, b) => b - a); // Descending order
         highestLevel = levelValues[0];
       }
+
+      // Keep the first page to update, delete the rest
+      pageToUpdate = existingPages[0];
+      for (let i = 1; i < existingPages.length; i++) {
+        await deletePage(existingPages[i].id);
+      }
     }
 
-    // Create a new page
-    var properties = {
+    // Prepare properties for the page
+    const properties = {
       Word: {
         title: [{ text: { content: word } }],
       },
@@ -136,7 +141,20 @@ async function createNotionPage(
       };
     }
 
-    const page = await createPage(properties);
+    let page;
+    if (pageToUpdate) {
+      // Update existing page: clear content and update properties
+      await clearPageContent(pageToUpdate.id);
+      page = await updatePage(pageToUpdate.id, properties, "📖");
+    } else {
+      // Create a new page
+      page = await createPage(properties);
+
+      // Set icon for newly created page
+      if (page && page.id) {
+        await updatePage(page.id, {}, "📖");
+      }
+    }
 
     // Add Cambridge data if available
     if (shouldFetchCambridge && page && page.id) {

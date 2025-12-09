@@ -122,6 +122,54 @@ export const deletePage = async (pageId) => {
   }
 };
 
+export const updatePage = async (pageId, properties, icon = null) => {
+  try {
+    const updateParams = {
+      page_id: pageId,
+      properties,
+    };
+
+    if (icon) {
+      updateParams.icon = {
+        type: "emoji",
+        emoji: icon,
+      };
+    }
+
+    const response = await notion.pages.update(updateParams);
+    return response;
+  } catch (error) {
+    logError("Error updating Notion page", error);
+    return null;
+  }
+};
+
+export const clearPageContent = async (pageId) => {
+  try {
+    // Get all children blocks of the page
+    const response = await notion.blocks.children.list({
+      block_id: pageId,
+      page_size: 100,
+    });
+
+    // Delete all children blocks
+    for (const block of response.results) {
+      try {
+        await notion.blocks.delete({
+          block_id: block.id,
+        });
+      } catch (error) {
+        logError(`Error deleting block ${block.id}`, error);
+      }
+    }
+
+    return true;
+  } catch (error) {
+    logError("Error clearing page content", error);
+    return false;
+  }
+};
+
 export const appendToPage = async (pageId, data) => {
   try {
     const children = [];
