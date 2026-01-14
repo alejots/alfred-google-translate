@@ -35,8 +35,52 @@ const urlObj = new globalThis.URL(targetUrl);
 const baseURL = urlObj.origin;
 console.error(`🌐 Base URL: ${baseURL}`);
 
-// Extract word information
-console.error("\n📖 Extracting word information...");
+// Find all dictionary sections
+const dictionarySections = [];
+const caldesDiv = document.querySelector('div[data-id="caldes"]');
+const englishSpanishDiv = document.querySelector(
+  'div[data-id="english-spanish"]'
+);
+const globalDiv = document.querySelector('div[data-id="K-EN-ES-GLOBAL"]');
+
+if (caldesDiv) {
+  dictionarySections.push({
+    id: "caldes",
+    name: "English-Spanish (CALD)",
+    div: caldesDiv,
+  });
+  console.error("✅ Found section: English-Spanish (CALD)");
+}
+
+if (englishSpanishDiv) {
+  dictionarySections.push({
+    id: "english-spanish",
+    name: "English-Spanish",
+    div: englishSpanishDiv,
+  });
+  console.error("✅ Found section: English-Spanish");
+}
+
+if (globalDiv) {
+  dictionarySections.push({
+    id: "K-EN-ES-GLOBAL",
+    name: "English-Spanish (Global)",
+    div: globalDiv,
+  });
+  console.error("✅ Found section: English-Spanish (Global)");
+}
+
+if (dictionarySections.length === 0) {
+  console.error("❌ Error: Could not find any dictionary sections");
+  process.exit(1);
+}
+
+console.error(
+  `\n📚 Processing ${dictionarySections.length} dictionary section(s)...\n`
+);
+
+// Extract word information from the first available section
+console.error("📖 Extracting word information...");
 
 const wordInfo = {
   word: "",
@@ -44,31 +88,34 @@ const wordInfo = {
   wordForms: "",
 };
 
-// Extract the main word
-const wordElement = document.querySelector(".di-title");
+// Try to extract from the first section
+const firstSection = dictionarySections[0].div;
+const wordElement = firstSection.querySelector(".di-title, .h2.tw-bw.dhw");
 wordInfo.word = wordElement ? wordElement.textContent.trim() : "";
 if (wordInfo.word) console.error(`   Word: ${wordInfo.word}`);
 
 // Extract part of speech
-const posElement = document.querySelector(".pos.dpos");
+const posElement = firstSection.querySelector(".pos.dpos");
 wordInfo.partOfSpeech = posElement ? posElement.textContent.trim() : "";
 if (wordInfo.partOfSpeech)
   console.error(`   Part of speech: ${wordInfo.partOfSpeech}`);
 
 // Extract word forms (e.g., "running | past ran | past participle run")
-const wordFormsElement = document.querySelector(".irreg-infls, .rreg-infls");
+const wordFormsElement = firstSection.querySelector(
+  ".irreg-infls, .rreg-infls"
+);
 if (wordFormsElement) {
   wordInfo.wordForms = wordFormsElement.textContent.trim();
   console.error(`   Word forms: ${wordInfo.wordForms}`);
 }
 
-// Extract pronunciations
+// Extract pronunciations from first section
 console.error("\n📝 Extracting pronunciation information...");
 
 const pronunciations = [];
 
 // UK pronunciation
-const ukPronContainer = document.querySelector(".uk.dloc");
+const ukPronContainer = firstSection.querySelector(".uk.dloc");
 const ukIpaElement = ukPronContainer
   ? ukPronContainer.parentElement.querySelector(".ipa.dipa")
   : null;
@@ -97,7 +144,7 @@ if (ukIpaElement || ukAudioElement) {
 }
 
 // US pronunciation
-const usPronContainer = document.querySelector(".us.dloc");
+const usPronContainer = firstSection.querySelector(".us.dloc");
 const usIpaElement = usPronContainer
   ? usPronContainer.parentElement.querySelector(".ipa.dipa")
   : null;
@@ -125,143 +172,260 @@ if (usIpaElement || usAudioElement) {
   });
 }
 
-// Extract senses
-console.error("\n📚 Extracting senses...");
+// Process each dictionary section
+const sections = [];
 
-const senseBlocks = document.querySelectorAll(
-  ".sense-block.pr.dsense, .sense-block.pr.dsense-noh"
-);
-const senses = [];
+for (const section of dictionarySections) {
+  console.error(`\n📚 Extracting from ${section.name}...`);
 
-senseBlocks.forEach((block, index) => {
-  console.error(`\n   Sense ${index + 1}:`);
-
-  // Extract sense title (may not exist for dsense-noh blocks)
-  const titleElement = block.querySelector(".sense-title strong.gw");
-  const title = titleElement ? titleElement.textContent.trim() : "";
-  if (title) console.error(`   - Title: ${title}`);
-
-  // Extract CEFR level
-  const levelElement = block.querySelector(".epp-xref.dxref");
-  const level = levelElement ? levelElement.textContent.trim() : "";
-  if (level) console.error(`   - Level: ${level}`);
-
-  // Extract definition
-  const defElement = block.querySelector(".def.ddef_d");
-  const definition = defElement ? defElement.textContent.trim() : "";
-  console.error(`   - Definition: ${definition}`);
-
-  // Extract translation(s) - look in both def-body and trans-block
-  const defBlock = block.querySelector(".def-block.ddef_block");
-  let transElements = [];
-
-  if (defBlock) {
-    // First try to find translations in .def-body (for titled senses)
-    transElements = defBlock.querySelectorAll(
-      ".def-body > .trans.dtrans.dtrans-se"
-    );
-
-    // If not found, look in .trans-block (for untitled senses)
-    if (transElements.length === 0) {
-      transElements = defBlock.querySelectorAll(
-        ".trans-block.dtrans-block > .trans.dtrans.dtrans-se"
-      );
-    }
-  }
-
-  const translations = Array.from(transElements)
-    .map((el) => el.textContent.trim())
-    .filter((t) => t);
-  const translation = translations.join(", ");
-  if (translation) console.error(`   - Translation: ${translation}`);
-
-  // Extract examples
-  const examples = [];
-
-  // Main example with translation
-  const mainExampleElement = block.querySelector(".examp.dexamp .eg.deg");
-  const mainExampleTransElement = block.querySelector(
-    ".examp.dexamp .trans.dtrans.dtrans-se.hdb"
+  const senseBlocks = section.div.querySelectorAll(
+    ".sense-block.pr.dsense, .sense-block.pr.dsense-noh"
   );
+  const senses = [];
 
-  if (mainExampleElement) {
-    const exampleText = mainExampleElement.textContent.trim();
-    const exampleTrans = mainExampleTransElement
-      ? mainExampleTransElement.textContent.trim()
-      : "";
-    examples.push({ en: exampleText, es: exampleTrans });
-    console.error(`   - Main example: ${exampleText}`);
-    if (exampleTrans) console.error(`     Trans: ${exampleTrans}`);
-  }
+  senseBlocks.forEach((block, index) => {
+    // Check if this sense-block has multiple def-blocks (multiple definitions in one sense)
+    const defBlocks = block.querySelectorAll(".def-block.ddef_block");
 
-  // Additional examples (from accordion)
-  const additionalExamples = block.querySelectorAll(".daccord .eg.dexamp.hax");
-  additionalExamples.forEach((exEl) => {
-    const exText = exEl.textContent.trim();
-    examples.push({ en: exText, es: "" });
-    console.error(`   - Additional: ${exText}`);
+    if (defBlocks.length > 1) {
+      // Structure: One sense-block with multiple def-blocks (e.g., "sear")
+      console.error(
+        `   Sense block ${index + 1} has ${defBlocks.length} definitions:`
+      );
+
+      // Extract grammar info once for all definitions (it's at the sense-block level)
+      const grammarElement = block.querySelector(".gram.dgram");
+      const grammar = grammarElement
+        ? grammarElement.textContent.trim().replace(/[\[\]]/g, "")
+        : "";
+      if (grammar) console.error(`   - Grammar: ${grammar}`);
+
+      defBlocks.forEach((defBlock, defIndex) => {
+        console.error(`   Definition ${defIndex + 1}:`);
+
+        // Extract definition
+        const defElement = defBlock.querySelector(".def.ddef_d");
+        const definition = defElement ? defElement.textContent.trim() : "";
+        if (definition) console.error(`   - Definition: ${definition}`);
+
+        // Extract translation(s)
+        let transElements = defBlock.querySelectorAll(
+          ".def-body > .trans.dtrans.dtrans-se"
+        );
+
+        if (transElements.length === 0) {
+          transElements = defBlock.querySelectorAll(
+            ".trans-block.dtrans-block > .trans.dtrans.dtrans-se"
+          );
+        }
+
+        const translations = Array.from(transElements)
+          .map((el) => el.textContent.trim())
+          .filter((t) => t);
+        const translation = translations.join(", ");
+        if (translation) console.error(`   - Translation: ${translation}`);
+
+        // Extract examples from this def-block
+        const examples = [];
+        const seenExamples = new Set();
+
+        const allExamples = defBlock.querySelectorAll(".examp.dexamp");
+        allExamples.forEach((exampBlock) => {
+          const exampleEn = exampBlock.querySelector(".eg.deg");
+          const exampleEs = exampBlock.querySelector(
+            ".trans.dtrans.dtrans-se.hdb"
+          );
+
+          if (exampleEn) {
+            const enText = exampleEn.textContent.trim();
+            const esText = exampleEs ? exampleEs.textContent.trim() : "";
+
+            if (!seenExamples.has(enText)) {
+              seenExamples.add(enText);
+              examples.push({ en: enText, es: esText });
+              console.error(`   - Example: ${enText}`);
+              if (esText) console.error(`     Trans: ${esText}`);
+            }
+          }
+        });
+
+        // Add this definition as a separate sense
+        if (definition) {
+          senses.push({
+            title: "",
+            phraseHead: "",
+            level: "",
+            grammar,
+            definition,
+            translation,
+            examples,
+          });
+        }
+      });
+    } else {
+      // Original structure: One sense-block with one definition
+      console.error(`   Sense ${index + 1}:`);
+
+      // Extract sense title (may not exist for dsense-noh blocks)
+      const titleElement = block.querySelector(".sense-title strong.gw");
+      const title = titleElement ? titleElement.textContent.trim() : "";
+      if (title) console.error(`   - Title: ${title}`);
+
+      // Extract phrase-head for phrase-blocks (used in Global section)
+      const phraseHeadElement = block.querySelector(
+        ".phrase-head .phrase.dphrase"
+      );
+      const phraseHead = phraseHeadElement
+        ? phraseHeadElement.textContent.trim()
+        : "";
+      if (phraseHead) console.error(`   - Phrase: ${phraseHead}`);
+
+      // Extract CEFR level
+      const levelElement = block.querySelector(".epp-xref.dxref");
+      const level = levelElement ? levelElement.textContent.trim() : "";
+      if (level) console.error(`   - Level: ${level}`);
+
+      // Extract grammar info
+      const grammarElement = block.querySelector(".gram.dgram");
+      const grammar = grammarElement
+        ? grammarElement.textContent.trim().replace(/[\[\]]/g, "")
+        : "";
+      if (grammar) console.error(`   - Grammar: ${grammar}`);
+
+      // Extract definition
+      const defElement = block.querySelector(".def.ddef_d");
+      const definition = defElement ? defElement.textContent.trim() : "";
+      if (definition) console.error(`   - Definition: ${definition}`);
+
+      // Extract translation(s) - look in both def-body and trans-block
+      const defBlock = block.querySelector(".def-block.ddef_block");
+      let transElements = [];
+
+      if (defBlock) {
+        // First try to find translations in .def-body (for titled senses)
+        transElements = defBlock.querySelectorAll(
+          ".def-body > .trans.dtrans.dtrans-se"
+        );
+
+        // If not found, look in .trans-block (for untitled senses)
+        if (transElements.length === 0) {
+          transElements = defBlock.querySelectorAll(
+            ".trans-block.dtrans-block > .trans.dtrans.dtrans-se"
+          );
+        }
+      }
+
+      const translations = Array.from(transElements)
+        .map((el) => el.textContent.trim())
+        .filter((t) => t);
+      const translation = translations.join(", ");
+      if (translation) console.error(`   - Translation: ${translation}`);
+
+      // Extract examples
+      const examples = [];
+      const seenExamples = new Set();
+
+      // Look for all example blocks
+      const allExamples = block.querySelectorAll(".examp.dexamp");
+      allExamples.forEach((exampBlock) => {
+        const exampleEn = exampBlock.querySelector(".eg.deg");
+        const exampleEs = exampBlock.querySelector(
+          ".trans.dtrans.dtrans-se.hdb"
+        );
+
+        if (exampleEn) {
+          const enText = exampleEn.textContent.trim();
+          const esText = exampleEs ? exampleEs.textContent.trim() : "";
+
+          // Check if we already have this example
+          if (!seenExamples.has(enText)) {
+            seenExamples.add(enText);
+            examples.push({ en: enText, es: esText });
+            console.error(`   - Example: ${enText}`);
+            if (esText) console.error(`     Trans: ${esText}`);
+          }
+        }
+      });
+
+      // Additional examples (from accordion)
+      const additionalExamples = block.querySelectorAll(
+        ".daccord .eg.dexamp.hax"
+      );
+      additionalExamples.forEach((exEl) => {
+        const exText = exEl.textContent.trim();
+        if (!seenExamples.has(exText)) {
+          seenExamples.add(exText);
+          examples.push({ en: exText, es: "" });
+          console.error(`   - Additional: ${exText}`);
+        }
+      });
+
+      // Add the sense even if there's no title (for adjectives, etc.)
+      if (title || definition || phraseHead) {
+        senses.push({
+          title,
+          phraseHead,
+          level,
+          grammar,
+          definition,
+          translation,
+          examples,
+        });
+      }
+    }
   });
 
-  // Add the sense even if there's no title (for adjectives, etc.)
-  if (title || definition) {
-    senses.push({
-      title,
-      level,
-      definition,
-      translation,
-      examples,
+  console.error(`   ✅ Extracted ${senses.length} senses`);
+
+  // Extract phrasal verbs
+  const phrasalVerbsSection = section.div.querySelector(".xref.phrasal_verbs");
+  const phrasalVerbs = [];
+
+  if (phrasalVerbsSection) {
+    const phrasalVerbLinks =
+      phrasalVerbsSection.querySelectorAll(".item a .phrase");
+    phrasalVerbLinks.forEach((link) => {
+      const phrase = link.textContent.trim();
+      if (phrase) {
+        phrasalVerbs.push(phrase);
+      }
     });
+    if (phrasalVerbs.length > 0) {
+      console.error(`   Found ${phrasalVerbs.length} phrasal verbs`);
+    }
   }
-});
 
-console.error(`\n✅ Extracted ${senses.length} senses`);
+  // Extract idioms
+  const idiomsSection = section.div.querySelector(".xref.idioms");
+  const idioms = [];
 
-// Extract phrasal verbs
-console.error("\n🔗 Extracting phrasal verbs...");
-
-const phrasalVerbsSection = document.querySelector(".xref.phrasal_verbs");
-const phrasalVerbs = [];
-
-if (phrasalVerbsSection) {
-  const phrasalVerbLinks =
-    phrasalVerbsSection.querySelectorAll(".item a .phrase");
-  phrasalVerbLinks.forEach((link) => {
-    const phrase = link.textContent.trim();
-    if (phrase) {
-      phrasalVerbs.push(phrase);
+  if (idiomsSection) {
+    const idiomLinks = idiomsSection.querySelectorAll(".item a .phrase");
+    idiomLinks.forEach((link) => {
+      const phrase = link.textContent.trim();
+      if (phrase) {
+        idioms.push(phrase);
+      }
+    });
+    if (idioms.length > 0) {
+      console.error(`   Found ${idioms.length} idioms`);
     }
+  }
+
+  sections.push({
+    id: section.id,
+    name: section.name,
+    senses,
+    phrasalVerbs,
+    idioms,
   });
-  console.error(`   Found ${phrasalVerbs.length} phrasal verbs`);
-} else {
-  console.error("   No phrasal verbs found");
-}
-
-// Extract idioms
-console.error("\n💡 Extracting idioms...");
-
-const idiomsSection = document.querySelector(".xref.idioms");
-const idioms = [];
-
-if (idiomsSection) {
-  const idiomLinks = idiomsSection.querySelectorAll(".item a .phrase");
-  idiomLinks.forEach((link) => {
-    const phrase = link.textContent.trim();
-    if (phrase) {
-      idioms.push(phrase);
-    }
-  });
-  console.error(`   Found ${idioms.length} idioms`);
-} else {
-  console.error("   No idioms found");
 }
 
 // Output JSON
 const result = {
   wordInfo,
   pronunciations,
-  senses,
-  phrasalVerbs,
-  idioms,
+  sections,
 };
 
 console.error("\n📋 Results:");
