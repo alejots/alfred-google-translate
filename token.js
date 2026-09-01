@@ -85,7 +85,7 @@ function updateTKK(opts) {
     if (Number(window.TKK.split(".")[0]) === now) {
       resolve();
     } else {
-      got(opts.domain, { agent: opts.agent })
+      got(opts.domain, { agent: opts.agent, http2: true })
         .then(function (res) {
           var matches = res.body.match(/tkk:\s?'(.+?)'/i);
 

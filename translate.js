@@ -27,7 +27,7 @@ function translate(text, opts) {
       return url + "?" + querystring.stringify(data);
     })
     .then(function (url) {
-      return got(url, { agent: opts.agent })
+      return got(url, { agent: opts.agent, http2: true })
         .then(function (res) {
           var body = JSON.parse(res.body);
 
